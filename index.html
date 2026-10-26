@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Multi-Panel Dispatch Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #0f111a; color: #fff; margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: auto; background: #16192b; padding: 25px; border-radius: 12px; border: 1px solid #232740; box-shadow: 0 8px 24px rgba(0,0,0,0.6); margin-bottom: 40px; }
+        
+        #loginOverlay { max-width: 400px; margin: 100px auto; background: #16192b; padding: 30px; border-radius: 12px; border: 1px solid #232740; box-shadow: 0 8px 24px rgba(0,0,0,0.6); text-align: center; }
+        #loginOverlay h2 { color: #ffaa00; margin-bottom: 20px; }
+        .login-group { margin-bottom: 15px; text-align: left; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #232740; padding-bottom: 15px; margin-bottom: 20px; }
+        .header-title h2 { margin: 0; color: #ffaa00; font-size: 22px; display: flex; align-items: center; gap: 8px; }
+        .header-title p { margin: 5px 0 0 0; color: #8c92ac; font-size: 13px; }
+        .header-actions { display: flex; align-items: center; gap: 15px; }
+        
+        .badge-connected { background: #132722; color: #00d26a; border: 1px solid #1a4d3c; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; }
+        .badge-disconnected { background: #3a1c24; color: #ff4d4d; border: 1px solid #5c2836; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; }
+        .btn-logout { background: #3a1c24; color: #ff4d4d; border: 1px solid #5c2836; padding: 6px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        .btn-logout:hover { background: #5c2836; color: #fff; }
+        
+        .top-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        label { font-size: 11px; font-weight: bold; color: #8c92ac; text-transform: uppercase; letter-spacing: 0.5px; }
+        input { background: #141622; border: 1px solid #282d4f; color: #fff !important; padding: 12px; border-radius: 6px; font-size: 14px; outline: none; }
+        input:focus { border-color: #ffaa00; }
+        
+        .cards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 25px; }
+        .card { background: #1b1f36; border: 1px solid #282d4f; border-radius: 8px; padding: 15px; }
+        .card-title { color: #ffaa00; font-weight: bold; font-size: 15px; margin-bottom: 15px; }
+        .card .form-group { margin-bottom: 12px; }
+        
+        .btn-send { width: 100%; background: #ffaa00; color: #000; border: none; padding: 15px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; text-align: center; }
+        .btn-send:hover { background: #ffbb11; }
+        
+        .logs-section { margin-top: 30px; background: #141622; padding: 15px; border-radius: 8px; border: 1px solid #282d4f; }
+        .message-card { padding: 12px 15px; margin-bottom: 15px; border-radius: 6px; position: relative; }
+        .message-card.inbound { background: #1b2838; border-left: 4px solid #00d26a; }
+        .message-card.outbound { background: #2a2014; border-left: 4px solid #ffaa00; }
+        .reply-btn { position: absolute; right: 12px; top: 12px; background: #282d4f; color: #ffaa00; border: none; padding: 5px 12px; font-size: 11px; cursor: pointer; border-radius: 4px; font-weight: bold; }
+        .reply-btn:hover { background: #ffaa00; color: #000; }
+        
+        .inline-reply-box { margin-top: 10px; display: flex; gap: 10px; border-top: 1px solid #282d4f; padding-top: 10px; }
+        .inline-reply-box input { flex: 1; padding: 8px; font-size: 13px; }
+        .inline-reply-box button { background: #00d26a; color: #000; border: none; padding: 8px 15px; font-weight: bold; border-radius: 6px; cursor: pointer; }
+        .inline-reply-box button:hover { background: #00f078; }
+    </style>
+</head>
+<body>
+
+<div id="loginOverlay">
+    <h2>🔒 Admin Login</h2>
+    <div class="login-group">
+        <label>Username</label>
+        <input type="text" id="loginUser" placeholder="Enter username" autocomplete="off">
+    </div>
+    <div class="login-group">
+        <label>Password</label>
+        <input type="password" id="loginPass" placeholder="Enter password" autocomplete="new-password">
+    </div>
+    <button class="btn-send" onclick="handleLogin()">Login</button>
+</div>
+
+<div id="dashboardContainer" class="container" style="display: none;">
+    <div class="header">
+        <div class="header-title">
+            <h2>⚡ Multi-Panel Dispatch Dashboard</h2>
+            <p>Direct backend WhatsApp automation with banner image</p>
+        </div>
+        <div class="header-actions">
+            <div id="statusBadge" class="badge-disconnected">Connecting...</div>
+            <button class="btn-logout" onclick="handleLogout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="top-inputs">
+        <div class="form-group">
+            <label>Client Mobile Number</label>
+            <input type="text" id="phoneInput" placeholder="Enter mobile number" autocomplete="off" value="">
+        </div>
+        <div class="form-group">
+            <label>Client Name</label>
+            <input type="text" id="clientNameInput" placeholder="Enter client name" autocomplete="off" value="">
+        </div>
+    </div>
+
+    <div class="cards-grid">
+        <div class="card">
+            <div class="card-title">YASH7777</div>
+            <div class="form-group"><label>Site URL</label><input type="text" id="url1" value="http://Yash7777.com"></div>
+            <div class="form-group"><label>Username ID</label><input type="text" id="user1" placeholder="Enter username" autocomplete="off"></div>
+            <div class="form-group"><label>Password</label><input type="text" id="pass1" placeholder="Enter password" autocomplete="off"></div>
+        </div>
+        <div class="card">
+            <div class="card-title">YASH9999</div>
+            <div class="form-group"><label>Site URL</label><input type="text" id="url2" value="http://Yash9999.com"></div>
+            <div class="form-group"><label>Username ID</label><input type="text" id="user2" placeholder="Enter username" autocomplete="off"></div>
+            <div class="form-group"><label>Password</label><input type="text" id="pass2" placeholder="Enter password" autocomplete="off"></div>
+        </div>
+        <div class="card">
+            <div class="card-title">ANGEL7777</div>
+            <div class="form-group"><label>Site URL</label><input type="text" id="url3" value="https://Angel7777.com"></div>
+            <div class="form-group"><label>Username ID</label><input type="text" id="user3" placeholder="Enter username" autocomplete="off"></div>
+            <div class="form-group"><label>Password</label><input type="text" id="pass3" placeholder="Enter password" autocomplete="off"></div>
+        </div>
+    </div>
+
+    <button class="btn-send" onclick="sendMultiPanelMessage()">Send Message</button>
+
+    <div class="logs-section">
+        <h3 style="color: #ffaa00; margin-top: 0;">Live Messages Inbox (Inbound & Outbound)</h3>
+        <div id="inboxContainer"><p style="color: #8c92ac;">Loading messages...</p></div>
+    </div>
+</div>
+
+<script>
+    window.onload = function() {
+        if (localStorage.getItem('isLoggedIn') === 'true') {
+            document.getElementById('loginOverlay').style.display = 'none';
+            document.getElementById('dashboardContainer').style.display = 'block';
+            fetchStatus();
+            fetchMessages();
+        }
+    };
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && document.getElementById('loginOverlay').style.display !== 'none') {
+            handleLogin();
+        }
+    });
+
+    async function handleLogin() {
+        let username = document.getElementById('loginUser').value;
+        let password = document.getElementById('loginPass').value;
+
+        try {
+            let res = await fetch('/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            let data = await res.json();
+            if (data.success) {
+                localStorage.setItem('isLoggedIn', 'true');
+                document.getElementById('loginOverlay').style.display = 'none';
+                document.getElementById('dashboardContainer').style.display = 'block';
+                fetchStatus();
+                fetchMessages();
+            } else {
+                alert(data.error);
+            }
+        } catch (e) {
+            alert('Login failed!');
+        }
+    }
+
+    function handleLogout() {
+        localStorage.removeItem('isLoggedIn');
+        document.getElementById('dashboardContainer').style.display = 'none';
+        document.getElementById('loginOverlay').style.display = 'block';
+    }
+
+    async function fetchStatus() {
+        try {
+            let res = await fetch('/status');
+            let data = await res.json();
+            let badge = document.getElementById('statusBadge');
+            if (data.status === 'Connected') {
+                badge.className = 'badge-connected';
+                badge.innerText = 'Connected';
+            } else {
+                badge.className = 'badge-disconnected';
+                badge.innerText = data.status;
+            }
+        } catch (e) {}
+    }
+
+    async function fetchMessages() {
+        try {
+            let res = await fetch('/messages');
+            let data = await res.json();
+            if (data.success && data.logs) {
+                let container = document.getElementById('inboxContainer');
+                
+                let openBoxes = {};
+                document.querySelectorAll('.inline-reply-box').forEach(box => {
+                    if (box.style.display === 'flex') {
+                        let input = box.querySelector('input');
+                        if (input) openBoxes[box.id] = input.value;
+                    }
+                });
+
+                if (data.logs.length === 0) {
+                    container.innerHTML = '<p style="color: #8c92ac;">No messages yet.</p>';
+                    return;
+                }
+
+                container.innerHTML = data.logs.slice().reverse().map((msg, index) => {
+                    let cardClass = msg.isFromMe ? 'message-card outbound' : 'message-card inbound';
+                    let tagText = msg.isFromMe ? 'Outbound' : 'Inbound';
+                    let displayName = (msg.from && msg.from !== 'Client' && !msg.from.startsWith('3227')) ? msg.from : 'Client';
+                    let phoneVal = (msg.displayPhone && msg.displayPhone.length === 10) ? msg.displayPhone : '';
+                    let uniqueId = 'replyBox_' + index;
+                    return `
+                        <div class="${cardClass}">
+                            <button class="reply-btn" onclick="toggleReplyBox('${uniqueId}')">Reply</button>
+                            <small style="color: #8c92ac;">${msg.time} | <b>${tagText}</b></small>
+                            <p style="margin: 5px 0; font-weight: bold; color: ${msg.isFromMe ? '#ffaa00' : '#00d26a'};">${displayName} ${phoneVal ? '('+phoneVal+')' : ''}</p>
+                            <p style="margin: 0; white-space: pre-wrap; color: #fff;">${msg.text}</p>
+                            
+                            <div id="${uniqueId}" class="inline-reply-box" style="display: none;">
+                                <input type="text" id="input_${uniqueId}" placeholder="Type reply message and press Enter..." autocomplete="off" onkeydown="handleInlineEnter(event, '${msg.rawJid}', '${displayName}', '${uniqueId}')">
+                                <button onclick="sendInlineReply('${msg.rawJid}', '${displayName}', '${uniqueId}')">Send</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                for (let id in openBoxes) {
+                    let box = document.getElementById(id);
+                    if (box) {
+                        box.style.display = 'flex';
+                        let input = box.querySelector('input');
+                        if (input) {
+                            input.value = openBoxes[id];
+                            input.focus();
+                        }
+                    }
+                }
+            }
+        } catch (e) {}
+    }
+
+    function toggleReplyBox(boxId) {
+        let box = document.getElementById(boxId);
+        if (box) {
+            box.style.display = box.style.display === 'none' ? 'flex' : 'none';
+        }
+    }
+
+    function handleInlineEnter(event, rawJid, clientName, boxId) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            sendInlineReply(rawJid, clientName, boxId);
+        }
+    }
+
+    async function sendInlineReply(rawJid, clientName, boxId) {
+        let inputField = document.getElementById('input_' + boxId);
+        let message = inputField.value.trim();
+
+        if (!message) {
+            alert('Please enter a reply message!');
+            return;
+        }
+
+        // Pass isInlineReply: true so banner image is skipped for quick replies
+        let res = await fetch('/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone: rawJid, message, clientName, isInlineReply: true })
+        });
+        let data = await res.json();
+        if (data.success) {
+            inputField.value = '';
+            document.getElementById(boxId).style.display = 'none';
+            fetchMessages();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    }
+
+    async function sendMultiPanelMessage() {
+        let phone = document.getElementById('phoneInput').value;
+        let clientName = document.getElementById('clientNameInput').value;
+        
+        let u1 = document.getElementById('url1').value;
+        let us1 = document.getElementById('user1').value;
+        let p1 = document.getElementById('pass1').value;
+
+        let u2 = document.getElementById('url2').value;
+        let us2 = document.getElementById('user2').value;
+        let p2 = document.getElementById('pass2').value;
+
+        let u3 = document.getElementById('url3').value;
+        let us3 = document.getElementById('user3').value;
+        let p3 = document.getElementById('pass3').value;
+
+        if (!phone) {
+            alert('Client Mobile Number is required!');
+            return;
+        }
+
+        if (!us1 || !p1 || !us2 || !p2 || !us3 || !p3) {
+            alert('Sabhi panels ke Username aur Password bharna zaroori hai!');
+            return;
+        }
+
+        let message = `Site : ${u1} 🔑\n` +
+                      `User 🆔 : ${us1}\n` +
+                      `Pass : ${p1}\n` +
+                      `1 point @ 1 Rupees\n` +
+                      `Fancy Minimum Bet 100\n` +
+                      `Match Minimum Bet 100\n\n` +
+                      `     ♛ *YASH9999*  ♛\n\n` +
+                      `Site : ${u2} 🔑\n` +
+                      `User 🆔 : ${us2}\n` +
+                      `Pass : ${p2}\n` +
+                      `1 point @ 1 Rupees\n` +
+                      `Fancy Minimum Bet 100\n` +
+                      `Match Minimum Bet 100\n\n` +
+                      `♛ANGEL7777 ♛\n\n` +
+                      `${u3}\n\n` +
+                      `Username :- ${us3}\n` +
+                      `PASSWORD = ${p3}\n\n` +
+                      `MINIMUM ID = 100\n` +
+                      `MINIMUM BET = 100\n` +
+                      `꧁💰𝐇𝐀𝐏𝐏𝐘 𝐆𝐀𝐌𝐈𝐍𝐆💰꧂\n\n` +
+                      `For New I'd and More Details, Kindly Send 'Hi Sonu' on 8988507777\n` +
+                      `*"Limited Offer 10% Bonus on First Deposit and Referal Id Bonus 5%"*\n` +
+                      `HURRY UP !\n` +
+                      `"High Risk High Reward ! Play Big, Win Big"`;
+
+        let res = await fetch('/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone, message, clientName, isInlineReply: false })
+        });
+        let data = await res.json();
+        if (data.success) {
+            alert('Message sent successfully!');
+            document.getElementById('phoneInput').value = '';
+            document.getElementById('clientNameInput').value = '';
+            fetchMessages();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    }
+
+    setInterval(() => {
+        if (localStorage.getItem('isLoggedIn') === 'true') {
+            fetchStatus();
+            fetchMessages();
+        }
+    }, 3000);
+</script>
+
+</body>
+</html>
