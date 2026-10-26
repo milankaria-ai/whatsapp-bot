@@ -10,8 +10,11 @@
         .container { width: 100%; max-width: 900px; background: #1e293b; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); margin-top: 20px; border: 1px solid #334155; }
         .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 15px; margin-bottom: 20px; }
         .header h2 { margin: 0; color: #f59e0b; font-size: 22px; }
+        .status-area { display: flex; align-items: center; gap: 10px; }
         .status-badge { background: #065f46; color: #34d399; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 6px; }
         .status-dot { width: 8px; height: 8px; background: #34d399; border-radius: 50%; }
+        .logout-btn { background: #dc2626; color: #fff; border: none; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; cursor: pointer; }
+        .logout-btn:hover { background: #b91c1c; }
         
         .top-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
         .form-group { display: flex; flex-direction: column; }
@@ -40,18 +43,21 @@
         <div class="header">
             <div>
                 <h2>⚡ Multi-Panel Dispatch Dashboard</h2>
-                <p style="margin:5px 0 0 0; color:#94a3b8; font-size:13px;">Direct WhatsApp automation with banner image</p>
+                <p id="botStatusText" style="margin:5px 0 0 0; color:#94a3b8; font-size:13px;">Checking connection...</p>
             </div>
-            <div class="status-badge">
-                <div class="status-dot"></div> Connected
+            <div class="status-area">
+                <div class="status-badge">
+                    <div class="status-dot"></div> <span id="connStatus">Connected</span>
+                </div>
+                <button class="logout-btn" onclick="triggerLogout()">Logout</button>
             </div>
         </div>
 
         <form id="dispatchForm" onsubmit="sendDispatch(event)">
             <div class="top-inputs">
                 <div class="form-group">
-                    <label>Client Mobile Number (JID)</label>
-                    <input type="text" id="clientJid" placeholder="e.g. 9191455867402@s.whatsapp.net" required>
+                    <label>Client Mobile Number</label>
+                    <input type="text" id="clientJid" placeholder="e.g. 9191455867402" required>
                 </div>
                 <div class="form-group">
                     <label>Client Name</label>
@@ -60,7 +66,6 @@
             </div>
 
             <div class="panels-grid">
-                <!-- Panel 1 -->
                 <div class="panel-card">
                     <div class="panel-title">YASH7777</div>
                     <div class="form-group">
@@ -77,7 +82,6 @@
                     </div>
                 </div>
 
-                <!-- Panel 2 -->
                 <div class="panel-card">
                     <div class="panel-title">YASH9999</div>
                     <div class="form-group">
@@ -94,7 +98,6 @@
                     </div>
                 </div>
 
-                <!-- Panel 3 -->
                 <div class="panel-card">
                     <div class="panel-title">ANGEL7777</div>
                     <div class="form-group">
@@ -122,6 +125,24 @@
     <script>
         const socket = io();
 
+        // Fetch bot status on load
+        fetch('/bot-status').then(res => res.json()).then(data => {
+            if (data.connected) {
+                document.getElementById('botStatusText').innerText = `Linked Number: +${data.number}`;
+            } else {
+                document.getElementById('botStatusText').innerText = `Status: Scan QR in Render Logs`;
+            }
+        });
+
+        function triggerLogout() {
+            if (confirm('Are you sure you want to logout and clear session?')) {
+                fetch('/logout', { method: 'POST' }).then(res => res.json()).then(data => {
+                    alert('Logged out successfully! Check Render logs for new QR code.');
+                    location.reload();
+                });
+            }
+        }
+
         function sendDispatch(e) {
             e.preventDefault();
             const jid = document.getElementById('clientJid').value;
@@ -139,7 +160,6 @@
                 body: JSON.stringify({ jid, name, panels })
             }).then(res => res.json()).then(data => {
                 if (data.success) {
-                    // Blank/clear input fields cleanly after sending
                     document.getElementById('clientJid').value = '';
                     document.getElementById('clientName').value = '';
                     document.getElementById('user1').value = '';
@@ -149,8 +169,9 @@
                     document.getElementById('user3').value = '';
                     document.getElementById('pass3').value = '';
                     document.getElementById('clientJid').focus();
+                    alert('Message sent successfully!');
                 } else {
-                    alert('Failed to send dispatch message.');
+                    alert('Failed: ' + (data.error || 'Bot not connected'));
                 }
             });
         }
