@@ -12,10 +12,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
-// Simple in-memory storage for contacts mapping and messages
-let clientContacts = {}; // { jid: name }
-let messageLogs = [];    // [{ name, jid, text, type, time }]
-
+let clientContacts = {}; 
+let messageLogs = [];    
 let globalSock = null;
 
 async function startBot() {
@@ -46,8 +44,6 @@ async function startBot() {
             if (!msg.key.fromMe && msg.message) {
                 const remoteJid = msg.key.remoteJid;
                 const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
-                
-                // Get name or fallback to JID
                 let senderName = clientContacts[remoteJid] || remoteJid.split('@')[0];
 
                 messageLogs.push({
@@ -59,13 +55,6 @@ async function startBot() {
                 });
 
                 io.emit('new_message', messageLogs[messageLogs.length - 1]);
-
-                // Send banner image automatically
-                const imagePath = path.join(__dirname, 'banner.jpeg');
-                await sock.sendMessage(remoteJid, {
-                    image: { url: imagePath },
-                    caption: `Welcome to Apex Media Grid! For new ID and details, check our banner above.`
-                });
             }
         } catch (err) {
             console.error('Error handling message:', err);
@@ -75,24 +64,53 @@ async function startBot() {
 
 startBot();
 
-// Routes
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// API to send message from dashboard inbox with Name mapping
-app.post('/send-message', async (sReq, sRes) => {
-    const { jid, name, message } = sReq.body;
-    if (globalSock && jid && message) {
+// API to format exact message and send with banner.jpg
+app.post('/send-dispatch', async (sReq, sRes) => {
+    const { jid, name, panels } = sReq.body;
+    if (globalSock && jid && panels) {
         if (name) {
             clientContacts[jid] = name;
         }
-        await globalSock.sendMessage(jid, { text: message });
+
+        // Exact formatted message as provided by user
+        let messageText = `Site : ${panels[0].url} 🔑\n`;
+        messageText += `User 🆔 :${panels[0].user}\n`;
+        messageText += `Pass : ${panels[0].pass}\n`;
+        messageText += `1 point @ 1 Rupees\nFancy Minimum Bet 100\nMatch Minimum Bet 100\n\n`;
+        messageText += `     ♛ *${panels[1].title}*  ♛\n\n`;
+        messageText += `Site : ${panels[1].url} 🔑\n`;
+        messageText += `User 🆔 : ${panels[1].user}\n`;
+        messageText += `Pass : ${panels[1].pass}\n`;
+        messageText += `1 point @ 1 Rupees\nFancy Minimum Bet 100\nMatch Minimum Bet 100\n\n`;
+        messageText += `♛${panels[2].title} ♛\n\n`;
+        messageText += `${panels[2].url}\n\n`;
+        messageText += `Username :-${panels[2].user}\n`;
+        messageText += `PASSWORD=${panels[2].pass}\n\n`;
+        messageText += `MINIMUM ID = 100\nMINIMUM BET = 100\n`;
+        messageText += `꧁💰𝐇𝐀𝐏𝐏𝐘 𝐆𝐀𝐌𝐈𝐍𝐆💰꧂\n\n`;
+        messageText += `For New I'd and More Details, Kindly Sent 'Hi Sonu' on 8988507777\n`;
+        messageText += `*"Limited Offer 10% Bonus on First Deposit and Referal Id Bonus 5%"*\n`;
+        messageText += `HURRY UP !\n`;
+        messageText += `"High Risk High Reward ! Play Big, Win Big"`;
+
+        try {
+            const imagePath = path.join(__dirname, 'banner.jpg');
+            await globalSock.sendMessage(jid, {
+                image: { url: imagePath },
+                caption: messageText
+            });
+        } catch (e) {
+            await globalSock.sendMessage(jid, { text: messageText });
+        }
         
         const logEntry = {
             name: name || clientContacts[jid] || jid.split('@')[0],
             jid: jid,
-            text: message,
+            text: messageText,
             type: 'outgoing',
             time: new Date().toLocaleTimeString()
         };
@@ -102,10 +120,6 @@ app.post('/send-message', async (sReq, sRes) => {
     } else {
         sRes.json({ success: false, error: 'Bot not connected or missing fields' });
     }
-});
-
-app.get('/messages', (req, res) => {
-    res.json(messageLogs);
 });
 
 const PORT = process.env.PORT || 3000;
