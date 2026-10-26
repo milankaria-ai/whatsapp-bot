@@ -7,7 +7,7 @@ const pino = require('pino');
 const app = express();
 const server = http.createServer(app);
 
-// Serve static files (like logo.png.jpg and banner.jpg)
+// Serve static files (like logo.png and banner.jpeg)
 app.use(express.static(path.join(__dirname)));
 
 app.get('/', (req, res) => {
@@ -38,7 +38,7 @@ async function startBot() {
         }
     });
 
-    // Client message ke sath image bhejne ka robust logic
+    // Client message ke sath banner.jpeg bhejne ka logic
     sock.ev.on('messages.upsert', async (m) => {
         try {
             const msg = m.messages[0];
@@ -48,7 +48,7 @@ async function startBot() {
                 
                 console.log(`Received message from ${remoteJid}: ${messageContent}`);
 
-                const imagePath = path.join(__dirname, 'banner.jpg');
+                const imagePath = path.join(__dirname, 'banner.jpeg');
                 
                 await sock.sendMessage(remoteJid, {
                     image: { url: imagePath },
