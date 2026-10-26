@@ -132,7 +132,7 @@ app.post('/send-dispatch', async (sReq, sRes) => {
         messageText += `"High Risk High Reward ! Play Big, Win Big"`;
 
         try {
-            const imagePath = path.join(__dirname, 'banner.jpg');
+            const imagePath = path.join(__dirname, 'banner.jpeg');
             await globalSock.sendMessage(targetJid, {
                 image: { url: imagePath },
                 caption: messageText
