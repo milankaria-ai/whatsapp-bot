@@ -1,4 +1,4 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, delay } = require('@whiskeysockets/baileys');
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -87,12 +87,14 @@ app.post('/request-pairing', async (req, res) => {
     if (globalSock && !isConnected && phoneNumber) {
         try {
             let cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
-            // Wait a second for socket to initialize if needed
+            // Brief pause to allow socket to stabilize
+            await delay(3000);
             let code = await globalSock.requestPairingCode(cleanNumber);
             latestPairingCode = code;
             res.json({ success: true, code: code });
         } catch (e) {
-            res.json({ success: false, error: e.message });
+            console.error('Pairing error:', e);
+            res.json({ success: false, error: e.message || 'Failed to generate code' });
         }
     } else {
         res.json({ success: false, error: 'Already connected or invalid number' });
