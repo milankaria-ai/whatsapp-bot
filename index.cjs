@@ -26,7 +26,8 @@ async function startBot() {
     const sock = makeWASocket({
         auth: state,
         logger: pino({ level: 'silent' }),
-        printQRInTerminal: false
+        printQRInTerminal: false,
+        browser: ['Chrome (Linux)', '', '']
     });
 
     globalSock = sock;
@@ -87,11 +88,14 @@ app.post('/request-pairing', async (req, res) => {
     if (globalSock && !isConnected && phoneNumber) {
         try {
             let cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
-            // Brief pause to allow socket to stabilize
-            await delay(3000);
-            let code = await globalSock.requestPairingCode(cleanNumber);
-            latestPairingCode = code;
-            res.json({ success: true, code: code });
+            if (!globalSock.authState.creds.registered) {
+                await delay(4000);
+                let code = await globalSock.requestPairingCode(cleanNumber);
+                latestPairingCode = code;
+                res.json({ success: true, code: code });
+            } else {
+                res.json({ success: false, error: 'Device already registered. Clear session or logout.' });
+            }
         } catch (e) {
             console.error('Pairing error:', e);
             res.json({ success: false, error: e.message || 'Failed to generate code' });
