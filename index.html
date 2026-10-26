@@ -11,7 +11,7 @@
         .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 15px; margin-bottom: 20px; }
         .header h2 { margin: 0; color: #f59e0b; font-size: 22px; }
         .status-area { display: flex; align-items: center; gap: 10px; }
-        .status-badge { padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 6px; transition: background 0.3s; }
+        .status-badge { padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 6px; }
         .status-dot { width: 8px; height: 8px; border-radius: 50%; }
         .logout-btn { background: #dc2626; color: #fff; border: none; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; cursor: pointer; }
         .logout-btn:hover { background: #b91c1c; }
@@ -21,6 +21,7 @@
         label { font-size: 11px; text-transform: uppercase; color: #94a3b8; font-weight: bold; margin-bottom: 6px; letter-spacing: 0.5px; }
         input { width: 100%; padding: 12px; background: #0f172a; border: 1px solid #334155; color: #fff; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
         input:focus { border-color: #f59e0b; outline: none; }
+        input[readonly] { background: #111827; color: #64748b; cursor: not-allowed; border-color: #1f2937; }
 
         .panels-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
         .panel-card { background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 15px; }
@@ -35,11 +36,32 @@
         .msg { padding: 10px; margin: 8px 0; border-radius: 6px; font-size: 13px; }
         .incoming { background: #334155; }
         .outgoing { background: #1e3a8a; text-align: right; }
+
+        .login-wrapper { display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .login-box { width: 100%; max-width: 400px; background: #1e293b; padding: 30px; border-radius: 12px; border: 1px solid #334155; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+        .login-box h2 { color: #f59e0b; text-align: center; margin-bottom: 20px; }
     </style>
 </head>
 <body>
 
-    <div class="container">
+    <div id="loginView" class="login-wrapper">
+        <div class="login-box">
+            <h2>🔐 Admin Login</h2>
+            <form onsubmit="handleLogin(event)">
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label>Username</label>
+                    <input type="text" id="loginUser" placeholder="admin" required>
+                </div>
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label>Password</label>
+                    <input type="password" id="loginPass" placeholder="admin123" required>
+                </div>
+                <button type="submit" class="send-btn">Login</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="dashboardView" class="container" style="display: none;">
         <div class="header">
             <div>
                 <h2>⚡ Multi-Panel Dispatch Dashboard</h2>
@@ -49,7 +71,7 @@
                 <div class="status-badge" id="statusBadge" style="background: #7f1d1d; color: #f87171;">
                     <div class="status-dot" id="statusDot" style="background: #f87171;"></div> <span id="connStatus">Disconnected</span>
                 </div>
-                <button class="logout-btn" onclick="triggerLogout()">Logout</button>
+                <button class="logout-btn" onclick="triggerAppLogout()">Logout</button>
             </div>
         </div>
 
@@ -125,6 +147,47 @@
     <script>
         const socket = io();
 
+        window.onload = function() {
+            if (localStorage.getItem('isLoggedIn') === 'true') {
+                showDashboard();
+            } else {
+                showLogin();
+            }
+        };
+
+        function showLogin() {
+            document.getElementById('loginView').style.display = 'flex';
+            document.getElementById('dashboardView').style.display = 'none';
+        }
+
+        function showDashboard() {
+            document.getElementById('loginView').style.display = 'none';
+            document.getElementById('dashboardView').style.display = 'block';
+            checkStatus();
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const u = document.getElementById('loginUser').value.trim();
+            const p = document.getElementById('loginPass').value.trim();
+
+            if (u === 'admin' && p === 'admin123') {
+                localStorage.setItem('isLoggedIn', 'true');
+                document.getElementById('loginUser').value = '';
+                document.getElementById('loginPass').value = '';
+                showDashboard();
+            } else {
+                alert('Wrong username or password! Use admin / admin123');
+            }
+        }
+
+        function triggerAppLogout() {
+            if (confirm('Are you sure you want to logout?')) {
+                localStorage.removeItem('isLoggedIn');
+                showLogin();
+            }
+        }
+
         function checkStatus() {
             fetch('/bot-status').then(res => res.json()).then(data => {
                 const badge = document.getElementById('statusBadge');
@@ -148,18 +211,11 @@
             });
         }
 
-        // Check status on load and poll every 3 seconds
-        checkStatus();
-        setInterval(checkStatus, 3000);
-
-        function triggerLogout() {
-            if (confirm('Are you sure you want to logout and clear session?')) {
-                fetch('/logout', { method: 'POST' }).then(res => res.json()).then(data => {
-                    alert('Logged out successfully! Check Render logs for new QR code.');
-                    checkStatus();
-                });
+        setInterval(() => {
+            if (localStorage.getItem('isLoggedIn') === 'true') {
+                checkStatus();
             }
-        }
+        }, 3000);
 
         function sendDispatch(e) {
             e.preventDefault();
