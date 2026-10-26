@@ -11,8 +11,8 @@
         .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 15px; margin-bottom: 20px; }
         .header h2 { margin: 0; color: #f59e0b; font-size: 22px; }
         .status-area { display: flex; align-items: center; gap: 10px; }
-        .status-badge { background: #065f46; color: #34d399; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 6px; }
-        .status-dot { width: 8px; height: 8px; background: #34d399; border-radius: 50%; }
+        .status-badge { padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 6px; transition: background 0.3s; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; }
         .logout-btn { background: #dc2626; color: #fff; border: none; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; cursor: pointer; }
         .logout-btn:hover { background: #b91c1c; }
         
@@ -46,8 +46,8 @@
                 <p id="botStatusText" style="margin:5px 0 0 0; color:#94a3b8; font-size:13px;">Checking connection...</p>
             </div>
             <div class="status-area">
-                <div class="status-badge">
-                    <div class="status-dot"></div> <span id="connStatus">Connected</span>
+                <div class="status-badge" id="statusBadge" style="background: #7f1d1d; color: #f87171;">
+                    <div class="status-dot" id="statusDot" style="background: #f87171;"></div> <span id="connStatus">Disconnected</span>
                 </div>
                 <button class="logout-btn" onclick="triggerLogout()">Logout</button>
             </div>
@@ -125,20 +125,38 @@
     <script>
         const socket = io();
 
-        // Fetch bot status on load
-        fetch('/bot-status').then(res => res.json()).then(data => {
-            if (data.connected) {
-                document.getElementById('botStatusText').innerText = `Linked Number: +${data.number}`;
-            } else {
-                document.getElementById('botStatusText').innerText = `Status: Scan QR in Render Logs`;
-            }
-        });
+        function checkStatus() {
+            fetch('/bot-status').then(res => res.json()).then(data => {
+                const badge = document.getElementById('statusBadge');
+                const dot = document.getElementById('statusDot');
+                const statusText = document.getElementById('connStatus');
+                const botStatusText = document.getElementById('botStatusText');
+
+                if (data.connected) {
+                    botStatusText.innerText = `Linked Number: +${data.number}`;
+                    badge.style.background = '#065f46';
+                    badge.style.color = '#34d399';
+                    dot.style.background = '#34d399';
+                    statusText.innerText = 'Connected';
+                } else {
+                    botStatusText.innerText = `Status: Scan QR in Render Logs`;
+                    badge.style.background = '#7f1d1d';
+                    badge.style.color = '#f87171';
+                    dot.style.background = '#f87171';
+                    statusText.innerText = 'Disconnected';
+                }
+            });
+        }
+
+        // Check status on load and poll every 3 seconds
+        checkStatus();
+        setInterval(checkStatus, 3000);
 
         function triggerLogout() {
             if (confirm('Are you sure you want to logout and clear session?')) {
                 fetch('/logout', { method: 'POST' }).then(res => res.json()).then(data => {
                     alert('Logged out successfully! Check Render logs for new QR code.');
-                    location.reload();
+                    checkStatus();
                 });
             }
         }
