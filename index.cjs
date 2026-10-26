@@ -3,6 +3,7 @@ const express = require('express');
 const http = require('http');
 const path = require('path');
 const pino = require('pino');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -15,6 +16,8 @@ app.use(express.static(path.join(__dirname)));
 let clientContacts = {}; 
 let messageLogs = [];    
 let globalSock = null;
+let isConnected = false;
+let connectedNumber = '';
 
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
@@ -31,10 +34,14 @@ async function startBot() {
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect } = update;
         if (connection === 'close') {
+            isConnected = false;
+            connectedNumber = '';
             const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
             if (shouldReconnect) { startBot(); }
         } else if (connection === 'open') {
-            console.log('WhatsApp Connected Successfully!');
+            isConnected = true;
+            connectedNumber = sock.user?.id ? sock.user.id.split(':')[0] : 'Connected';
+            console.log('WhatsApp Connected Successfully!', connectedNumber);
         }
     });
 
@@ -68,15 +75,42 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// API to format exact message and send with banner.jpg
+app.get('/bot-status', (req, res) => {
+    res.json({ connected: isConnected, number: connectedNumber });
+});
+
+app.post('/logout', (req, res) => {
+    try {
+        if (globalSock) {
+            globalSock.logout();
+        }
+        // Remove auth folder
+        const authPath = path.join(__dirname, 'auth_info_baileys');
+        if (fs.existsSync(authPath)) {
+            fs.rmSync(authPath, { recursive: true, force: true });
+        }
+        isConnected = false;
+        connectedNumber = '';
+        res.json({ success: true });
+        setTimeout(() => { startBot(); }, 2000);
+    } catch (e) {
+        res.json({ success: false, error: e.message });
+    }
+});
+
 app.post('/send-dispatch', async (sReq, sRes) => {
-    const { jid, name, panels } = sReq.body;
-    if (globalSock && jid && panels) {
-        if (name) {
-            clientContacts[jid] = name;
+    let { jid, name, panels } = sReq.body;
+    if (globalSock && isConnected && jid && panels) {
+        // Auto format JID if user entered plain number
+        let targetJid = jid.trim();
+        if (!targetJid.includes('@')) {
+            targetJid = targetJid + '@s.whatsapp.net';
         }
 
-        // Exact formatted message as provided by user
+        if (name) {
+            clientContacts[targetJid] = name;
+        }
+
         let messageText = `Site : ${panels[0].url} 🔑\n`;
         messageText += `User 🆔 :${panels[0].user}\n`;
         messageText += `Pass : ${panels[0].pass}\n`;
@@ -99,17 +133,17 @@ app.post('/send-dispatch', async (sReq, sRes) => {
 
         try {
             const imagePath = path.join(__dirname, 'banner.jpg');
-            await globalSock.sendMessage(jid, {
+            await globalSock.sendMessage(targetJid, {
                 image: { url: imagePath },
                 caption: messageText
             });
         } catch (e) {
-            await globalSock.sendMessage(jid, { text: messageText });
+            await globalSock.sendMessage(targetJid, { text: messageText });
         }
         
         const logEntry = {
-            name: name || clientContacts[jid] || jid.split('@')[0],
-            jid: jid,
+            name: name || clientContacts[targetJid] || targetJid.split('@')[0],
+            jid: targetJid,
             text: messageText,
             type: 'outgoing',
             time: new Date().toLocaleTimeString()
