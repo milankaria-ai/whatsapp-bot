@@ -3,91 +3,154 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Apex Media Grid - Dashboard</title>
+    <title>Multi-Panel Dispatch Dashboard</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         body { font-family: Arial, sans-serif; background: #0f172a; color: #fff; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .container { width: 100%; max-width: 600px; background: #1e293b; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); margin-top: 20px; }
-        input, textarea, button { width: 100%; padding: 10px; margin: 8px 0; background: #0f172a; border: 1px solid #38bdf8; color: #fff; border-radius: 5px; box-sizing: border-box; }
-        button { background: #38bdf8; color: #0f172a; font-weight: bold; cursor: pointer; }
-        button:hover { background: #0ea5e9; }
-        .logo { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 2px solid #38bdf8; display: block; margin: 0 auto 10px auto; }
-        .hidden { display: none !important; }
-        .chat-box { max-height: 300px; overflow-y: auto; background: #0f172a; padding: 10px; border-radius: 5px; margin-top: 10px; }
-        .msg { padding: 8px; margin: 5px 0; border-radius: 4px; }
+        .container { width: 100%; max-width: 900px; background: #1e293b; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); margin-top: 20px; border: 1px solid #334155; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 15px; margin-bottom: 20px; }
+        .header h2 { margin: 0; color: #f59e0b; font-size: 22px; }
+        .status-badge { background: #065f46; color: #34d399; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; display: flex; align-items: center; gap: 6px; }
+        .status-dot { width: 8px; height: 8px; background: #34d399; border-radius: 50%; }
+        
+        .top-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .form-group { display: flex; flex-direction: column; }
+        label { font-size: 11px; text-transform: uppercase; color: #94a3b8; font-weight: bold; margin-bottom: 6px; letter-spacing: 0.5px; }
+        input { width: 100%; padding: 12px; background: #0f172a; border: 1px solid #334155; color: #fff; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
+        input:focus { border-color: #f59e0b; outline: none; }
+
+        .panels-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+        .panel-card { background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 15px; }
+        .panel-title { color: #f59e0b; font-weight: bold; font-size: 15px; margin-bottom: 12px; border-bottom: 1px solid #1e293b; padding-bottom: 8px; }
+        .panel-card .form-group { margin-bottom: 10px; }
+        .panel-card input { padding: 9px; font-size: 12px; }
+
+        .send-btn { width: 100%; background: #f59e0b; color: #0f172a; font-weight: bold; padding: 14px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; transition: background 0.2s; }
+        .send-btn:hover { background: #d97706; }
+
+        .chat-box { max-height: 250px; overflow-y: auto; background: #0f172a; padding: 15px; border-radius: 8px; margin-top: 25px; border: 1px solid #334155; }
+        .msg { padding: 10px; margin: 8px 0; border-radius: 6px; font-size: 13px; }
         .incoming { background: #334155; }
-        .outgoing { background: #0369a1; text-align: right; }
+        .outgoing { background: #1e3a8a; text-align: right; }
     </style>
 </head>
 <body>
 
-    <!-- Login Section -->
-    <div id="loginSection" class="container">
-        <img src="logo.png" alt="Logo" class="logo">
-        <h2 style="text-align: center; color: #38bdf8;">Apex Media Grid Login</h2>
-        <form id="loginForm" onsubmit="handleLogin(event)">
-            <input type="password" id="passwordInput" placeholder="Enter Admin Password" required autofocus>
-            <button type="submit">Login</button>
-        </form>
-    </div>
-
-    <!-- Dashboard Section -->
-    <div id="dashboardSection" class="container hidden">
-        <div style="text-align: center;">
-            <img src="logo.png" alt="Logo" class="logo">
-            <h2 style="color: #38bdf8; margin: 5px 0;">Apex Media Grid Dashboard</h2>
-            <p style="color: #22c55e; font-weight: bold;">Status: Connected & Online</p>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h2>⚡ Multi-Panel Dispatch Dashboard</h2>
+                <p style="margin:5px 0 0 0; color:#94a3b8; font-size:13px;">Direct WhatsApp automation with banner image</p>
+            </div>
+            <div class="status-badge">
+                <div class="status-dot"></div> Connected
+            </div>
         </div>
 
-        <h3>Send Message / Register Client</h3>
-        <form id="msgForm" onsubmit="sendMessage(event)">
-            <input type="text" id="clientName" placeholder="Client Name (from form)" required>
-            <input type="text" id="clientJid" placeholder="Client WhatsApp Number (e.g. 9198888xxxxx@s.whatsapp.net)" required>
-            <textarea id="clientMessage" rows="3" placeholder="Type your message here..." required></textarea>
-            <button type="submit">Send Message</button>
+        <form id="dispatchForm" onsubmit="sendDispatch(event)">
+            <div class="top-inputs">
+                <div class="form-group">
+                    <label>Client Mobile Number (JID)</label>
+                    <input type="text" id="clientJid" placeholder="e.g. 9191455867402@s.whatsapp.net" required>
+                </div>
+                <div class="form-group">
+                    <label>Client Name</label>
+                    <input type="text" id="clientName" placeholder="e.g. Dharma" required>
+                </div>
+            </div>
+
+            <div class="panels-grid">
+                <!-- Panel 1 -->
+                <div class="panel-card">
+                    <div class="panel-title">YASH7777</div>
+                    <div class="form-group">
+                        <label>Site URL</label>
+                        <input type="text" id="url1" value="http://Yash7777.com" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Username ID</label>
+                        <input type="text" id="user1" placeholder="Enter Username ID" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="text" id="pass1" placeholder="Enter Password" required>
+                    </div>
+                </div>
+
+                <!-- Panel 2 -->
+                <div class="panel-card">
+                    <div class="panel-title">YASH9999</div>
+                    <div class="form-group">
+                        <label>Site URL</label>
+                        <input type="text" id="url2" value="http://Yash9999.com" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Username ID</label>
+                        <input type="text" id="user2" placeholder="Enter Username ID" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="text" id="pass2" placeholder="Enter Password" required>
+                    </div>
+                </div>
+
+                <!-- Panel 3 -->
+                <div class="panel-card">
+                    <div class="panel-title">ANGEL7777</div>
+                    <div class="form-group">
+                        <label>Site URL</label>
+                        <input type="text" id="url3" value="https://Angel7777.com" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Username ID</label>
+                        <input type="text" id="user3" placeholder="Enter Username ID" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="text" id="pass3" placeholder="Enter Password" required>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="send-btn">Send Message & Banner</button>
         </form>
 
-        <h3>Live Inbox</h3>
-        <div id="inbox" class="chat-box">
-            <!-- Messages will appear here with names -->
-        </div>
+        <h3>Live Inbox Logs</h3>
+        <div id="inbox" class="chat-box"></div>
     </div>
 
     <script>
         const socket = io();
 
-        function handleLogin(e) {
+        function sendDispatch(e) {
             e.preventDefault();
-            const pass = document.getElementById('passwordInput').value;
-            // Simple password check (change 'admin123' as desired)
-            if (pass === 'admin123') {
-                document.getElementById('loginSection').classList.add('hidden');
-                document.getElementById('dashboardSection').classList.remove('hidden');
-                loadMessages();
-            } else {
-                alert('Wrong Password!');
-            }
-        }
-
-        function sendMessage(e) {
-            e.preventDefault();
-            const name = document.getElementById('clientName').value;
             const jid = document.getElementById('clientJid').value;
-            const message = document.getElementById('clientMessage').value;
+            const name = document.getElementById('clientName').value;
 
-            fetch('/send-message', {
+            const panels = [
+                { title: 'YASH7777', url: document.getElementById('url1').value, user: document.getElementById('user1').value, pass: document.getElementById('pass1').value },
+                { title: 'YASH9999', url: document.getElementById('url2').value, user: document.getElementById('user2').value, pass: document.getElementById('pass2').value },
+                { title: 'ANGEL7777', url: document.getElementById('url3').value, user: document.getElementById('user3').value, pass: document.getElementById('pass3').value }
+            ];
+
+            fetch('/send-dispatch', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ jid, name, message })
+                body: JSON.stringify({ jid, name, panels })
             }).then(res => res.json()).then(data => {
                 if (data.success) {
-                    // Blank the input boxes cleanly after sending as requested
-                    document.getElementById('clientName').value = '';
+                    // Blank/clear input fields cleanly after sending
                     document.getElementById('clientJid').value = '';
-                    document.getElementById('clientMessage').value = '';
-                    document.getElementById('clientName').focus();
+                    document.getElementById('clientName').value = '';
+                    document.getElementById('user1').value = '';
+                    document.getElementById('pass1').value = '';
+                    document.getElementById('user2').value = '';
+                    document.getElementById('pass2').value = '';
+                    document.getElementById('user3').value = '';
+                    document.getElementById('pass3').value = '';
+                    document.getElementById('clientJid').focus();
                 } else {
-                    alert('Failed to send message.');
+                    alert('Failed to send dispatch message.');
                 }
             });
         }
@@ -96,29 +159,14 @@
             appendMessage(msg);
         });
 
-        function loadMessages() {
-            fetch('/messages').then(res => res.json()).then(messages => {
-                const inbox = document.getElementById('inbox');
-                inbox.innerHTML = '';
-                messages.forEach(msg => appendMessage(msg));
-            });
-        }
-
         function appendMessage(msg) {
             const inbox = document.getElementById('inbox');
             const div = document.createElement('div');
             div.className = `msg ${msg.type}`;
-            div.innerHTML = `<strong>${msg.name}</strong>[cite: 14]: ${msg.text} <br><small style="font-size:10px; color:#94a3b8;">${msg.time}</small>`;
+            div.innerHTML = `<strong>${msg.name}</strong>: ${msg.text.replace(/\n/g, '<br>')} <br><small style="font-size:10px; color:#94a3b8;">${msg.time}</small>`;
             inbox.appendChild(div);
             inbox.scrollTop = inbox.scrollHeight;
         }
-
-        // Allow Enter key submission cleanly across fields
-        document.addEventListener('keydown', function(event) {
-            if (event.key === 'Enter' && document.activeElement.tagName === 'INPUT') {
-                // Form handles submit naturally via onsubmit
-            }
-        });
     </script>
 </body>
 </html>
