@@ -18,6 +18,7 @@ let messageLogs = [];
 let globalSock = null;
 let isConnected = false;
 let connectedNumber = '';
+let latestPairingCode = '';
 
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
@@ -25,7 +26,7 @@ async function startBot() {
     const sock = makeWASocket({
         auth: state,
         logger: pino({ level: 'silent' }),
-        printQRInTerminal: true
+        printQRInTerminal: false
     });
 
     globalSock = sock;
@@ -36,11 +37,13 @@ async function startBot() {
         if (connection === 'close') {
             isConnected = false;
             connectedNumber = '';
+            latestPairingCode = '';
             const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
             if (shouldReconnect) { startBot(); }
         } else if (connection === 'open') {
             isConnected = true;
             connectedNumber = sock.user?.id ? sock.user.id.split(':')[0] : 'Connected';
+            latestPairingCode = '';
             console.log('WhatsApp Connected Successfully!', connectedNumber);
         }
     });
@@ -76,7 +79,24 @@ app.get('/', (req, res) => {
 });
 
 app.get('/bot-status', (req, res) => {
-    res.json({ connected: isConnected, number: connectedNumber });
+    res.json({ connected: isConnected, number: connectedNumber, pairingCode: latestPairingCode });
+});
+
+app.post('/request-pairing', async (req, res) => {
+    let { phoneNumber } = req.body;
+    if (globalSock && !isConnected && phoneNumber) {
+        try {
+            let cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
+            // Wait a second for socket to initialize if needed
+            let code = await globalSock.requestPairingCode(cleanNumber);
+            latestPairingCode = code;
+            res.json({ success: true, code: code });
+        } catch (e) {
+            res.json({ success: false, error: e.message });
+        }
+    } else {
+        res.json({ success: false, error: 'Already connected or invalid number' });
+    }
 });
 
 app.post('/logout', (req, res) => {
@@ -90,6 +110,7 @@ app.post('/logout', (req, res) => {
         }
         isConnected = false;
         connectedNumber = '';
+        latestPairingCode = '';
         res.json({ success: true });
         setTimeout(() => { startBot(); }, 2000);
     } catch (e) {
