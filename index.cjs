@@ -6,13 +6,17 @@ const pino = require('pino');
 
 const app = express();
 const server = http.createServer(app);
+const io = require('socket.io')(server);
 
-// Serve static files (like logo.png and banner.jpeg)
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
+// Simple in-memory storage for contacts mapping and messages
+let clientContacts = {}; // { jid: name }
+let messageLogs = [];    // [{ name, jid, text, type, time }]
+
+let globalSock = null;
 
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
@@ -23,47 +27,88 @@ async function startBot() {
         printQRInTerminal: true
     });
 
+    globalSock = sock;
     sock.ev.on('creds.update', saveCreds);
 
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect } = update;
         if (connection === 'close') {
             const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log('Connection closed due to ', lastDisconnect?.error, ', reconnecting ', shouldReconnect);
-            if (shouldReconnect) {
-                startBot();
-            }
+            if (shouldReconnect) { startBot(); }
         } else if (connection === 'open') {
-            console.log('Connected to WhatsApp successfully!');
+            console.log('WhatsApp Connected Successfully!');
         }
     });
 
-    // Client message ke sath banner.jpeg bhejne ka logic
     sock.ev.on('messages.upsert', async (m) => {
         try {
             const msg = m.messages[0];
             if (!msg.key.fromMe && msg.message) {
                 const remoteJid = msg.key.remoteJid;
-                const messageContent = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+                const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
                 
-                console.log(`Received message from ${remoteJid}: ${messageContent}`);
+                // Get name or fallback to JID
+                let senderName = clientContacts[remoteJid] || remoteJid.split('@')[0];
 
+                messageLogs.push({
+                    name: senderName,
+                    jid: remoteJid,
+                    text: text,
+                    type: 'incoming',
+                    time: new Date().toLocaleTimeString()
+                });
+
+                io.emit('new_message', messageLogs[messageLogs.length - 1]);
+
+                // Send banner image automatically
                 const imagePath = path.join(__dirname, 'banner.jpeg');
-                
                 await sock.sendMessage(remoteJid, {
                     image: { url: imagePath },
-                    caption: 'Welcome to Apex Media Grid! For new ID and more details, check out our banner above.'
+                    caption: `Welcome to Apex Media Grid! For new ID and details, check our banner above.`
                 });
             }
-        } catch (error) {
-            console.error('Error handling message:', error);
+        } catch (err) {
+            console.error('Error handling message:', err);
         }
     });
 }
 
 startBot();
 
+// Routes
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// API to send message from dashboard inbox with Name mapping
+app.post('/send-message', async (sReq, sRes) => {
+    const { jid, name, message } = sReq.body;
+    if (globalSock && jid && message) {
+        if (name) {
+            clientContacts[jid] = name;
+        }
+        await globalSock.sendMessage(jid, { text: message });
+        
+        const logEntry = {
+            name: name || clientContacts[jid] || jid.split('@')[0],
+            jid: jid,
+            text: message,
+            type: 'outgoing',
+            time: new Date().toLocaleTimeString()
+        };
+        messageLogs.push(logEntry);
+        io.emit('new_message', logEntry);
+        sRes.json({ success: true });
+    } else {
+        sRes.json({ success: false, error: 'Bot not connected or missing fields' });
+    }
+});
+
+app.get('/messages', (req, res) => {
+    res.json(messageLogs);
+});
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
